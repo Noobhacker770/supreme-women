@@ -116,7 +116,7 @@ const defaultState = (): GameState => ({
   version: 4, completed: [], collectibles: [], achievements: [], bonks: 0, flowers: 0,
   petCare: 0, compliments: [], outfit: [], stars: 0, danceScore: 0, mysterySolved: 0,
   buttonPresses: 0, cafeOrders: 0, musicScore: 0, chocolateScore: 0, quizScore: 0,
-  sound: false, reducedMotion: false, revealSeen: false
+  sound: true, reducedMotion: false, revealSeen: false
 });
 
 function loadState(): GameState {
@@ -179,16 +179,60 @@ function ProgressRing({ value }: { value: number }) {
   </div>;
 }
 
+function playSfx(kind: 'click'|'complete'|'back'|'success', enabled: boolean) {
+  if (!enabled || typeof window === 'undefined') return;
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    const notes = kind === 'complete' ? [523.25, 659.25, 783.99] : kind === 'success' ? [659.25, 783.99] : kind === 'back' ? [392, 329.63] : [440];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = kind === 'click' ? 'sine' : 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now + i * 0.07);
+      gain.gain.exponentialRampToValueAtTime(kind === 'click' ? 0.035 : 0.07, now + i * 0.07 + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + (kind === 'click' ? 0.06 : 0.22));
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + i * 0.07);
+      osc.stop(now + i * 0.07 + (kind === 'click' ? 0.07 : 0.24));
+    });
+    window.setTimeout(() => ctx.close().catch(() => {}), 500);
+  } catch {}
+}
+
 function RoomShell({ activity, state, setState, onBack, children }: {
   activity: Activity; state: GameState; setState: React.Dispatch<React.SetStateAction<GameState>>; onBack?: () => void; children: React.ReactNode;
 }) {
   const done = state.completed.includes(activity.id);
+  const wasDone = useRef(done);
+  const [showComplete, setShowComplete] = useState(false);
+  const index = ACTIVITIES.findIndex(a => a.id === activity.id);
+  const next = ACTIVITIES[index + 1];
   const goBack = onBack ?? (() => window.dispatchEvent(new Event('tiny-universe-back')));
+
+  useEffect(() => {
+    if (!wasDone.current && done) {
+      setShowComplete(true);
+      playSfx('complete', state.sound);
+    }
+    wasDone.current = done;
+  }, [done, state.sound]);
+
+  const continueNext = () => {
+    playSfx('success', state.sound);
+    setShowComplete(false);
+    if (next) window.dispatchEvent(new CustomEvent('tiny-universe-next', { detail: next.id }));
+    else goBack();
+  };
+
   return <div className={`room-page theme-${activity.theme}`}>
     <Stars count={28}/>
     <div className="room-noise" />
     <header className="room-nav">
-      <button className="glass-icon" onClick={goBack} aria-label="Back to world map"><ArrowLeft /></button>
+      <button className="glass-icon" onClick={() => { playSfx('back', state.sound); goBack(); }} aria-label="Back to world map"><ArrowLeft /></button>
       <div className="room-title-block"><span>{activity.kicker}</span><h1>{activity.title}</h1></div>
       <div className={`room-status ${done ? 'complete' : ''}`}>{done ? <><Check size={14}/> COMPLETE</> : 'EXPLORING'}</div>
     </header>
@@ -196,6 +240,18 @@ function RoomShell({ activity, state, setState, onBack, children }: {
       <div className="room-intro"><p>{activity.subtitle}</p><div className="artifact-chip"><Sparkles size={14}/> Artifact: <b>{activity.collectible}</b></div></div>
       {children}
     </main>
+    {showComplete && <div className="completion-overlay" role="dialog" aria-modal="true">
+      <div className="completion-card">
+        <div className="completion-spark">✦</div>
+        <span className="mini-kicker">WORLD COMPLETE</span>
+        <h2>{activity.title}</h2>
+        <p><Sparkles size={15}/> <b>{activity.collectible}</b> added to your universe.</p>
+        <div className="completion-actions">
+          {next ? <button className="mega-action" onClick={continueNext}>NEXT WORLD <ChevronRight/></button> : <button className="mega-action" onClick={continueNext}>RETURN TO MAP <ArrowLeft/></button>}
+          <button className="secondary" onClick={() => setShowComplete(false)}>STAY HERE</button>
+        </div>
+      </div>
+    </div>}
   </div>;
 }
 
@@ -215,7 +271,7 @@ function BonkRoom({ state, setState, activity }: { state: GameState; setState: R
       return next >= 12 ? completeRoom(n, activity.id, activity.collectible) : n;
     });
   };
-  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => {}}>
+  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => window.dispatchEvent(new Event('tiny-universe-back'))}>
     <div className="anger-room">
       <div className="comic-speed-lines" />
       <div className={`bonk-stage ${shake ? 'shake' : ''}`}>
@@ -233,7 +289,7 @@ function CafeRoom({ state, setState, activity }: { state: GameState; setState: R
   const order = ['Strawberry', 'Cloud Cream', 'Tiny Sprinkles'];
   const add = (x: string) => { if (recipe.includes(x)) return; const r = [...recipe, x]; setRecipe(r); if (r.length === order.length) setStep(1); };
   const finish = () => setState(prev => completeRoom({ ...prev, cafeOrders: prev.cafeOrders + 1 }, activity.id, activity.collectible));
-  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => {}}>
+  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => window.dispatchEvent(new Event('tiny-universe-back'))}>
     <div className="cafe-room"><div className="cafe-counter"><div className="cafe-sign">STRAWBERRY<br/><em>CAFÉ</em></div><div className="cake-display"><div className="cake-layer top"/><div className="cake-layer mid"/><div className="cake-layer bottom"/><span>✦</span></div></div>
       <div className="recipe-card"><span className="mini-kicker">TODAY'S IMPOSSIBLY IMPORTANT ORDER</span><h2>Pink Cloud No. 07</h2><div className="recipe-steps">{order.map((x,i)=><div className={recipe.includes(x) ? 'done' : ''} key={x}><b>0{i+1}</b>{x}{recipe.includes(x)&&<Check/>}</div>)}</div><div className="ingredient-grid">{ingredients.map(x=><button disabled={recipe.includes(x)} key={x} onClick={() => add(x)}>{x}</button>)}</div><button className="mega-action" disabled={step===0} onClick={finish}>{step===0?'FOLLOW THE RECIPE':'SERVE THE MASTERPIECE'} <CakeSlice/></button></div>
     </div>
@@ -245,7 +301,7 @@ function GardenRoom({ state, setState, activity }: { state: GameState; setState:
   const plants = Array.from({ length: 6 }, (_, i) => ({ id: i, x: 10 + i * 16, y: 58 + (i % 2) * 7 }));
   const grow = (i: number) => { setSelected(i); setWater(0); };
   const waterPlant = () => { const n = water + 1; setWater(n); if (n >= 3) setState(prev => ({ ...prev, flowers: Math.min(12, prev.flowers + 1), ...(prev.flowers + 1 >= 5 ? completeRoom({ ...prev }, activity.id, activity.collectible) : {}) })); };
-  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => {}}>
+  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => window.dispatchEvent(new Event('tiny-universe-back'))}>
     <div className="garden-room"><div className="garden-sky"><div className="sun"/><div className="mountain m1"/><div className="mountain m2"/><div className="petals">✦　✿　·　✧　✿　·</div></div><div className="garden-ground">{plants.map(p=><button key={p.id} className={`plant ${state.flowers > p.id ? 'grown' : ''} ${selected === p.id ? 'selected' : ''}`} style={{ left: `${p.x}%`, top: `${p.y}%` }} onClick={() => grow(p.id)}><span className="stem"/><span className="flower-head">✿</span></button>)}</div><div className="garden-hud"><div><small>GROWN</small><strong>{state.flowers}/5</strong></div>{selected !== null ? <><span className="selected-seed">Selected patch #{selected + 1}</span><button className="water-btn" onClick={waterPlant}>WATER <Waves/> {water}/3</button></> : <p>Choose a little patch of earth.</p>}</div></div>
   </RoomShell>;
 }
@@ -256,7 +312,7 @@ function CloudRoom({ state, setState, activity }: { state: GameState; setState: 
   const start = () => { setScore(0); setTime(20); setRunning(true); interval.current = window.setInterval(() => setTime(t => { if (t <= 1) { window.clearInterval(interval.current!); setRunning(false); return 0; } return t - 1; }), 1000); };
   useEffect(() => { if (!running && score >= 12) setState(prev => ({ ...prev, stars: Math.max(prev.stars, score), ...(score >= 12 ? completeRoom(prev, activity.id, activity.collectible) : {}) })); }, [running, score, activity, setState]);
   const catchStar = () => { if (!running) return; setScore(v => v + 1); setTarget(v => (v + 1) % 8); };
-  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => {}}>
+  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => window.dispatchEvent(new Event('tiny-universe-back'))}>
     <div className="cloud-room"><div className="cloud-stats"><span><Star/> {score} stars</span><span><Timer/> {time}s</span></div><div className="sky-arena">{Array.from({length:8},(_,i)=><button key={i} className={`sky-star ${i===target?'active':''}`} style={{ left: `${10 + ((i*31)%80)}%`, top: `${16 + ((i*43)%64)}%` }} onClick={catchStar}><Star fill="currentColor"/></button>)}<div className="cloud-bank one"/><div className="cloud-bank two"/></div><div className="center-cta">{!running?<button className="mega-action" onClick={start}>START STARFALL <Star/></button>:<p>Catch the glowing star. Ignore the suspicious clouds.</p>}</div></div>
   </RoomShell>;
 }
@@ -264,7 +320,7 @@ function CloudRoom({ state, setState, activity }: { state: GameState; setState: 
 function CozyRoom({ state, setState, activity }: { state: GameState; setState: React.Dispatch<React.SetStateAction<GameState>>; activity: Activity }) {
   const [found, setFound] = useState<number[]>([]); const objects = ['lamp', 'book', 'mug', 'cat', 'key', 'letter'];
   const click = (i:number) => { const f=addUnique(found,i); setFound(f); if(f.length>=5) setState(prev=>completeRoom(prev,activity.id,activity.collectible)); };
-  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => {}}><div className="cozy-room"><div className="window"><div className="moon-window"/><span>2:17 AM</span></div><div className="room-furniture"><div className="sofa"/><div className="table"/><div className="rug"/></div>{objects.map((o,i)=><button key={o} className={`hidden-object object-${o} ${found.includes(i)?'found':''}`} onClick={()=>click(i)}>{found.includes(i)?<Check/>:o==='cat'?<Cat/>:<Sparkles/>}</button>)}<div className="cozy-caption">{found.length}/5 little things found · {found.length===5?'The room feels warmer.':'Look carefully. The quiet things are usually hiding.'}</div></div></RoomShell>;
+  return <RoomShell activity={activity} state={state} setState={setState} onBack={() => window.dispatchEvent(new Event('tiny-universe-back'))}><div className="cozy-room"><div className="window"><div className="moon-window"/><span>2:17 AM</span></div><div className="room-furniture"><div className="sofa"/><div className="table"/><div className="rug"/></div>{objects.map((o,i)=><button key={o} className={`hidden-object object-${o} ${found.includes(i)?'found':''}`} onClick={()=>click(i)}>{found.includes(i)?<Check/>:o==='cat'?<Cat/>:<Sparkles/>}</button>)}<div className="cozy-caption">{found.length}/5 little things found · {found.length===5?'The room feels warmer.':'Look carefully. The quiet things are usually hiding.'}</div></div></RoomShell>;
 }
 
 function ArcadeRoom({ state, setState, activity }: { state: GameState; setState: React.Dispatch<React.SetStateAction<GameState>>; activity: Activity }) {
@@ -360,7 +416,8 @@ function App() {
   const activity=useMemo(()=>ACTIVITIES.find(a=>a.id===active),[active]);
   const completedCount=state.completed.length; const progress=pct(state.collectibles.length,18); const finalUnlocked=state.completed.length>=12 || state.collectibles.length>=12;
   useEffect(()=>{try{localStorage.setItem('tiny-universe-v4',JSON.stringify(state))}catch{}},[state]);
-  useEffect(()=>{const back=()=>setActive(null);window.addEventListener('tiny-universe-back',back);return()=>window.removeEventListener('tiny-universe-back',back)},[]);
+  useEffect(()=>{const click=(e:PointerEvent)=>{if(!state.sound)return;const target=e.target as HTMLElement|null;if(target?.closest('button,[role=button]'))playSfx('click',true)};window.addEventListener('pointerdown',click);return()=>window.removeEventListener('pointerdown',click)},[state.sound]);
+  useEffect(()=>{const back=()=>setActive(null);const next=(e:Event)=>{const id=(e as CustomEvent<ActivityId>).detail;if(id)setActive(id)};window.addEventListener('tiny-universe-back',back);window.addEventListener('tiny-universe-next',next);return()=>{window.removeEventListener('tiny-universe-back',back);window.removeEventListener('tiny-universe-next',next)}},[]);
   useEffect(()=>{setState(prev=>{let a=[...prev.achievements];const add=(x:string)=>{if(!a.includes(x))a.push(x)};if(prev.bonks>=12)add('Comic Menace');if(prev.flowers>=5)add('Garden Architect');if(prev.cafeOrders>=3)add('Sugar Architect');if(prev.stars>=12)add('Star Catcher');if(prev.mysterySolved>=4)add('Tiny Detective');if(prev.petCare>=5)add('Certified Softie');if(prev.danceScore>=40)add('Main Character');if(prev.buttonPresses>=15)add('Button Criminal');if(prev.compliments.length>=3)add('Compliment Scientist');if(prev.chocolateScore>=1)add('Confectioner');if(prev.quizScore>=3)add('Quiz Menace');if(prev.collectibles.length>=12)add('Collector');if(prev.completed.length===18)add('World Explorer');if(finalUnlocked)add('The Final Door');return a.length===prev.achievements.length?prev:{...prev,achievements:a}})},[state.bonks,state.flowers,state.cafeOrders,state.stars,state.mysterySolved,state.petCare,state.danceScore,state.buttonPresses,state.compliments.length,state.chocolateScore,state.quizScore,state.collectibles.length,state.completed.length,finalUnlocked]);
   const reset=()=>{if(window.confirm('Reset the entire universe?'))setState(defaultState())};
   if(active==='moon' && activity)return <MoonRoom activity={activity} state={state} setState={setState} onFinal={()=>setActive('final')} />;
