@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  ArrowLeft, ArrowRight, Check, ChevronRight, CircleHelp, Cloud, Crown, Flower2,
-  Gift, Heart, KeyRound, LockKeyhole, Moon, Music2, Pause, Play, RotateCcw, Settings,
+  ArrowLeft, ArrowRight, Check, ChevronRight, CircleHelp, Cloud as CloudIcon, Crown, Flower2,
+  Gift, Heart, KeyRound, LockKeyhole, Moon as MoonIcon, Music2, Pause, Play, RotateCcw, Settings,
   Shirt, Sparkles, Star, Timer, Trophy, Volume2, VolumeX, Waves, X, Zap, Cat, CakeSlice,
   Dices, Gem, Camera, Coffee, Wand2, Shield, CircleDot, Palette, Scissors, Footprints,
   Droplets, Search, Eye, Flame, Rainbow, Disc3, Ticket, Lightbulb, Medal
@@ -28,7 +28,7 @@ const A:Activity[]=[
 {id:'anger',title:'The Anger Room',kicker:'01 · COMIC RELIEF',subtitle:'Bonk the responsible party with increasingly ridiculous objects.',collectible:'Impact Star',theme:'anger',icon:<Zap/>},
 {id:'cafe',title:'Strawberry Café',kicker:'02 · PATISSERIE',subtitle:'Assemble the order in the exact sequence the tiny chef demands.',collectible:'Strawberry Charm',theme:'cafe',icon:<CakeSlice/>},
 {id:'garden',title:'Cherry Blossom Garden',kicker:'03 · GARDEN',subtitle:'Plant five flowers, water them, and watch the garden wake up.',collectible:'Blossom',theme:'garden',icon:<Flower2/>},
-{id:'cloud',title:'Cloud Kingdom',kicker:'04 · SKY',subtitle:'Chase the glowing star as it jumps around the clouds.',collectible:'Star Fragment',theme:'cloud',icon:<Cloud/>},
+{id:'cloud',title:'Cloud Kingdom',kicker:'04 · SKY',subtitle:'Chase the glowing star as it jumps around the clouds.',collectible:'Star Fragment',theme:'cloud',icon:<CloudIcon/>},
 {id:'cozy',title:'The Cozy Room',kicker:'05 · HIDEAWAY',subtitle:'Find six little objects hiding in the lamplight.',collectible:'Firefly',theme:'cozy',icon:<Coffee/>},
 {id:'arcade',title:'Neon Arcade',kicker:'06 · ARCADE',subtitle:'Hit the target before it teleports somewhere else.',collectible:'Arcade Token',theme:'arcade',icon:<CircleDot/>},
 {id:'dress',title:'The Wardrobe',kicker:'07 · COUTURE',subtitle:'Build a complete look. The clothes actually appear on the character.',collectible:'Ribbon',theme:'dress',icon:<Shirt/>},
@@ -42,7 +42,7 @@ const A:Activity[]=[
 {id:'button',title:'The Forbidden Button',kicker:'15 · DO NOT',subtitle:'It says do not press it. Obviously that means press it.',collectible:'Warning Badge',theme:'button',icon:<Shield/>},
 {id:'quiz',title:'The Extremely Official Quiz',kicker:'16 · CLASSIFIED',subtitle:'Answer three absurdly important questions. You may retry.',collectible:'Quiz Seal',theme:'quiz',icon:<CircleHelp/>},
 {id:'castle',title:'Achievement Castle',kicker:'17 · ARCHIVE',subtitle:'Place five artifacts into the castle and watch the collection come alive.',collectible:'Crown Fragment',theme:'castle',icon:<Crown/>},
-{id:'moon',title:'Moonlight Observatory',kicker:'18 · CONSTELLATION',subtitle:'Connect every glowing star in order. The sky is hiding something.',collectible:'Moonstone',theme:'moon',icon:<Moon/>}
+{id:'moon',title:'Moonlight Observatory',kicker:'18 · CONSTELLATION',subtitle:'Connect every glowing star in order. The sky is hiding something.',collectible:'Moonstone',theme:'moon',icon:<MoonIcon/>}
 ];
 const defaultState=():State=>({v:6,completed:[],collectibles:[],achievements:[],visited:[],bonks:0,flowers:0,stars:0,cozyFound:0,arcade:0,outfit:[],spins:0,music:0,chocolate:0,pet:0,dance:0,mystery:0,compliments:0,button:0,quiz:0,castle:0,moon:0,sound:true,reduced:false});
 function load():State{try{const x=JSON.parse(localStorage.getItem('tiny-universe-v6')||'null');return x?.v===6?{...defaultState(),...x}:defaultState()}catch{return defaultState()}}
